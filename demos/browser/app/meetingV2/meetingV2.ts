@@ -413,7 +413,7 @@ export class DemoMeetingApp
     }
 
     document.querySelector('#back-to-home-btn').addEventListener('click', () =>{
-      window.location.href = window.location.pathname;
+      window.location.reload();
     })
 
     document.getElementById('form-authenticate').addEventListener('submit', e => {
