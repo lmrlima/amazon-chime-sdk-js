@@ -238,6 +238,11 @@ export default class DefaultClientMetricReport implements ClientMetricReport {
     bytesSent: { transform: this.bitsPerSecond, type: SdkMetric.Type.VIDEO_SENT_BITRATE },
     droppedFrames: { transform: this.countPerSecond, type: SdkMetric.Type.VIDEO_DROPPED_FPS },
     qpSum: { transform: this.countPerSecond, type: SdkMetric.Type.VIDEO_SENT_QP_SUM },
+    googFrameHeightSent: {
+      transform: this.identityValue,
+      type: SdkMetric.Type.VIDEO_ENCODE_HEIGHT,
+    },
+    googFrameWidthSent: { transform: this.identityValue, type: SdkMetric.Type.VIDEO_ENCODE_WIDTH },
   };
 
   readonly videoDownstreamMetricMap: {
@@ -297,6 +302,14 @@ export default class DefaultClientMetricReport implements ClientMetricReport {
       transform: this.countPerSecond,
       type: SdkMetric.Type.VIDEO_RECEIVED_QP_SUM,
     },
+    googFrameHeightReceived: {
+      transform: this.identityValue,
+      type: SdkMetric.Type.VIDEO_DECODE_HEIGHT,
+    },
+    googFrameWidthReceived: {
+      transform: this.identityValue,
+      type: SdkMetric.Type.VIDEO_DECODE_WIDTH,
+    },
   };
 
   getMetricMap(
@@ -330,6 +343,69 @@ export default class DefaultClientMetricReport implements ClientMetricReport {
   }
 
   /**
+   *  media Stream metrics
+   */
+
+  readonly observableVideoMetricSpec: {
+    [id: string]: {
+      source: string;
+      media?: MediaType;
+      dir?: Direction;
+    };
+  } = {
+    videoUpstreamBitrate: {
+      source: 'bytesSent',
+      media: MediaType.VIDEO,
+      dir: Direction.UPSTREAM,
+    },
+    videoUpstreamPacketsSent: {
+      source: 'packetsSent',
+      media: MediaType.VIDEO,
+      dir: Direction.UPSTREAM,
+    },
+    videoUpstreamFramesEncodedPerSecond: {
+      source: 'framesEncoded',
+      media: MediaType.VIDEO,
+      dir: Direction.UPSTREAM,
+    },
+    videoUpstreamFrameHeight: {
+      source: 'googFrameHeightSent',
+      media: MediaType.VIDEO,
+      dir: Direction.UPSTREAM,
+    },
+    videoUpstreamFrameWidth: {
+      source: 'googFrameWidthSent',
+      media: MediaType.VIDEO,
+      dir: Direction.UPSTREAM,
+    },
+    videoDownstreamBitrate: {
+      source: 'bytesReceived',
+      media: MediaType.VIDEO,
+      dir: Direction.DOWNSTREAM,
+    },
+    videoDownstreamPacketLossPercent: {
+      source: 'packetsLost',
+      media: MediaType.VIDEO,
+      dir: Direction.DOWNSTREAM,
+    },
+    videoDownstreamFramesDecodedPerSecond: {
+      source: 'framesDecoded',
+      media: MediaType.VIDEO,
+      dir: Direction.DOWNSTREAM,
+    },
+    videoDownstreamFrameHeight: {
+      source: 'googFrameHeightReceived',
+      media: MediaType.VIDEO,
+      dir: Direction.DOWNSTREAM,
+    },
+    videoDownstreamFrameWidth: {
+      source: 'googFrameWidthReceived',
+      media: MediaType.VIDEO,
+      dir: Direction.DOWNSTREAM,
+    },
+  };
+
+  /**
    * Observable metrics and related APIs
    */
 
@@ -354,6 +430,16 @@ export default class DefaultClientMetricReport implements ClientMetricReport {
       source: 'googDecodingNormal',
       media: MediaType.AUDIO,
       dir: Direction.DOWNSTREAM,
+    },
+    audioPacketsSent: {
+      source: 'packetsSent',
+      media: MediaType.AUDIO,
+      dir: Direction.UPSTREAM,
+    },
+    audioPacketLossPercent: {
+      source: 'packetsLost',
+      media: MediaType.AUDIO,
+      dir: Direction.UPSTREAM,
     },
     videoUpstreamBitrate: { source: 'bytesSent', media: MediaType.VIDEO, dir: Direction.UPSTREAM },
     videoPacketSentPerSecond: {
@@ -410,12 +496,60 @@ export default class DefaultClientMetricReport implements ClientMetricReport {
     return 0;
   }
 
+  getObservableVideoMetricValue(metricName: string, ssrcNum: number): number {
+    const observableVideoMetricSpec = this.observableVideoMetricSpec[metricName];
+    const metricMap = this.getMetricMap(
+      observableVideoMetricSpec.media,
+      observableVideoMetricSpec.dir
+    );
+    const metricSpec = metricMap[observableVideoMetricSpec.source];
+    const transform = metricSpec.transform;
+    const source = metricSpec.source;
+    const streamMetricReport = this.streamMetricReports[ssrcNum];
+    if (
+      streamMetricReport &&
+      observableVideoMetricSpec.source in streamMetricReport.currentMetrics
+    ) {
+      return source
+        ? transform(source, Number(ssrcNum))
+        : transform(observableVideoMetricSpec.source, Number(ssrcNum));
+    }
+    return 0;
+  }
+
   getObservableMetrics(): { [id: string]: number } {
     const metric: { [id: string]: number } = {};
     for (const metricName in this.observableMetricSpec) {
       metric[metricName] = this.getObservableMetricValue(metricName);
     }
     return metric;
+  }
+
+  getObservableVideoUpstreamMetrics(): { [id: string]: {} } {
+    return this.getObservableVideoMetrics(Direction.UPSTREAM);
+  }
+
+  getObservableVideoDownstreamMetrics(): { [id: string]: {} } {
+    return this.getObservableVideoMetrics(Direction.DOWNSTREAM);
+  }
+
+  getObservableVideoMetrics(direction: number): { [id: string]: {} } {
+    const mediaStreamMetrics: { [id: string]: {} } = {};
+    for (const ssrc in this.streamMetricReports) {
+      if (
+        this.streamMetricReports[ssrc].direction === direction &&
+        this.streamMetricReports[ssrc].mediaType === MediaType.VIDEO
+      ) {
+        const metric: { [id: string]: number } = {};
+        for (const metricName in this.observableVideoMetricSpec) {
+          if (this.observableVideoMetricSpec[metricName].dir === direction) {
+            metric[metricName] = this.getObservableVideoMetricValue(metricName, Number(ssrc));
+          }
+        }
+        mediaStreamMetrics[ssrc] = metric;
+      }
+    }
+    return mediaStreamMetrics;
   }
 
   /**

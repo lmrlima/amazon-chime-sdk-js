@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this to trigger a signaling socket connection prior to device selection: call
   `audioVideo.start({ signalingOnly: true })`, and then later call
   `audioVideo.start()` as usual.
+- Add downstream audio webrtc metrics in observableMetricSpec
+- Add getObservableVideoUpstreamMetrics and getObservableVideoDownstreamMetrics in ClientMetricReport to expose video stream metrics in webrtc
+- Update `SignalingProtocol` with optional video metric fields
 
 ### Changed
 

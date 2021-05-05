@@ -374,6 +374,14 @@ describe('MonitorTask', () => {
         getObservableMetrics(): { [id: string]: number } {
           return;
         }
+
+        getObservableVideoUpstreamMetrics(): { [id: string]: number } {
+          return;
+        }
+
+        getObservableVideoDownstreamMetrics(): { [id: string]: number } {
+          return;
+        }
       }
       task.metricsDidReceive(undefined);
       const clientMetricReport = new TestClientMetricReport();
