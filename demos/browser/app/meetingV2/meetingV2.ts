@@ -236,6 +236,7 @@ export class DemoMeetingApp
   static readonly MAX_MEETING_HISTORY_MS: number = 5 * 60 * 1000;
   static readonly DATA_MESSAGE_TOPIC: string = 'chat';
   static readonly DATA_MESSAGE_LIFETIME_MS: number = 300_000;
+  static readonly RES_COUNT: number = 6;
 
   // Ideally we don't need to change this. Keep this configurable in case users have a super slow network.
   loadingBodyPixDependencyTimeoutMs: number = 10_000;
@@ -269,6 +270,8 @@ export class DemoMeetingApp
   cameraDeviceIds: string[] = [];
   microphoneDeviceIds: string[] = [];
   currentAudioInputDevice: AudioInputDevice | undefined;
+
+  currentRes: number = 2;
 
   buttonStates: { [key: string]: boolean } = {
     'button-microphone': true,
@@ -635,20 +638,64 @@ export class DemoMeetingApp
       }
     });
 
-    const videoInputQuality = document.getElementById('video-input-quality') as HTMLSelectElement;
-    videoInputQuality.addEventListener('change', async (_ev: Event) => {
-      this.log('Video input quality is changed');
-      switch (videoInputQuality.value) {
+    const videoInputQuality2 = document.getElementById('video-input-quality-2') as HTMLSelectElement;
+    videoInputQuality2.addEventListener('change', async (_ev: Event) => {
+      this.log('Video input quality is changed: ' + videoInputQuality2.value);
+      switch (videoInputQuality2.value) {
         case '360p':
-          this.audioVideo.chooseVideoInputQuality(640, 360, 15, 600);
+          this.currentRes = 0;
+          break;
+        case '360p30':
+          this.currentRes = 1;
           break;
         case '540p':
-          this.audioVideo.chooseVideoInputQuality(960, 540, 15, 1400);
+          this.currentRes = 2;
+          break;
+        case '540p30':
+          this.currentRes = 3;
           break;
         case '720p':
-          this.audioVideo.chooseVideoInputQuality(1280, 720, 15, 1400);
+          this.currentRes = 4;
+          break;
+        case '720p30':
+          this.currentRes = 5;
           break;
       }
+      try {
+        this.audioVideo.stopLocalVideoTile();
+        this.updateRes();
+        await this.openVideoInputFromSelection(videoInput.value, false);
+        this.audioVideo.startLocalVideoTile();
+      } catch (err) {
+        fatal(err);
+        this.log('no video input device selected');
+      }
+    });
+
+    const videoInputQuality = document.getElementById('video-input-quality') as HTMLSelectElement;
+    videoInputQuality.addEventListener('change', async (_ev: Event) => {
+      this.log('Video input quality is changed: ' + videoInputQuality.value);
+      switch (videoInputQuality.value) {
+        case '360p':
+          this.currentRes = 0;
+          break;
+        case '360p30':
+          this.currentRes = 1;
+          break;
+        case '540p':
+          this.currentRes = 2;
+          break;
+        case '540p30':
+          this.currentRes = 3;
+          break;
+        case '720p':
+          this.currentRes = 4;
+          break;
+        case '720p30':
+          this.currentRes = 5;
+          break;
+      }
+      this.updateRes();
       try {
         await this.openVideoInputFromSelection(videoInput.value, true);
       } catch (err) {
@@ -777,6 +824,7 @@ export class DemoMeetingApp
             if (videoInput.value === 'None') {
               camera = this.cameraDeviceIds.length ? this.cameraDeviceIds[0] : 'None';
             }
+            // this.increaseRes();
             await this.openVideoInputFromSelection(camera, false);
             this.audioVideo.startLocalVideoTile();
           } catch (err) {
@@ -1680,6 +1728,41 @@ export class DemoMeetingApp
         return stream;
       }
     );
+  }
+
+  updateRes(): void {
+    switch (this.currentRes) {
+      case 0:
+        console.log("chooseVideoInputQuality(640, 360, 15, 600)");
+        this.audioVideo.chooseVideoInputQuality(640, 360, 15, 600);
+        break;
+      case 1:
+        console.log("chooseVideoInputQuality(640, 360, 30, 1200)");
+        this.audioVideo.chooseVideoInputQuality(640, 360, 30, 1200);
+        break;
+      case 2:
+        console.log("chooseVideoInputQuality(960, 540, 15, 1400)");
+        this.audioVideo.chooseVideoInputQuality(960, 540, 15, 1400);
+        break;
+      case 3:
+        console.log("chooseVideoInputQuality(960, 540, 30, 5600)");
+        this.audioVideo.chooseVideoInputQuality(960, 540, 30, 5600);
+        break;
+      case 4:
+        console.log("chooseVideoInputQuality(1280, 720, 15, 1400)");
+        this.audioVideo.chooseVideoInputQuality(1280, 720, 15, 1400);
+        break;
+      case 5:
+        console.log("chooseVideoInputQuality(1280, 720, 30, 5600)");
+        this.audioVideo.chooseVideoInputQuality(1280, 720, 30, 5600);
+        break;
+    }
+  }
+
+  increaseRes(): void {
+    this.currentRes = (this.currentRes + 1) % DemoMeetingApp.RES_COUNT;
+    console.log("Current res: " + this.currentRes);
+    this.updateRes();
   }
 
   populateDeviceList(
